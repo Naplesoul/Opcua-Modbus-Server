@@ -35,6 +35,7 @@ git clone --branch v1.7.15 https://github.com/DaveGamble/cJSON.git
 cd ./cJSON
 mkdir build && cd build
 cmake ..
+make
 sudo make install
 ```
 
