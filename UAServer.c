@@ -3,9 +3,9 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-26 00:12:29
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-01-29 00:02:55
+ * @LastEditTime: 2022-01-29 22:33:50
  */
-#include "lib/open62541.h"
+#include <open62541/server.h>
 
 #include "UAServer.h"
 
@@ -127,4 +127,12 @@ UA_StatusCode start_server(OPCUA_Server *server)
     server->running = true;
     UA_StatusCode status_code = UA_Server_run(server->ua_server, server->running);
     return status_code;
+}
+
+void on_read(UA_Server *server,
+			 const UA_NodeId *session_id, void *session_context,
+             const UA_NodeId *node_id, void *node_context,
+             const UA_NumericRange *range, const UA_DataValue *data)
+{
+
 }

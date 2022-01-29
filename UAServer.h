@@ -10,8 +10,8 @@
 
 #include <stdlib.h>
 
-#include "lib/cJSON.h"
-#include "lib/open62541.h"
+#include <cjson/cJSON.h>
+#include <open62541/server.h>
 
 typedef struct
 {
