@@ -15,7 +15,7 @@ sudo apt-get install gcc cmake automake autoconf libtool
 ### 1. Build dependency for open62541
 
 ```bash
-git clone --branch v1.2.3 git@github.com:open62541/open62541.git
+git clone --branch v1.2.3 https://github.com/open62541/open62541.git
 cd ./open62541
 git submodule update --init --recursive
 mkdir build && cd build
@@ -31,7 +31,7 @@ now you can include headers for open62541, for example: `#include <open62541/ser
 ### 2. Build dependency for cJSON
 
 ```bash
-git clone --branch v1.7.15 git@github.com:DaveGamble/cJSON.git
+git clone --branch v1.7.15 https://github.com/DaveGamble/cJSON.git
 cd ./cJSON
 mkdir build && cd build
 cmake ..
