@@ -6,6 +6,7 @@
  * @LastEditTime: 2022-01-29 22:33:50
  */
 #include <open62541/server.h>
+#include "libmodbus/src/modbus.h"
 
 #include "UAServer.h"
 
@@ -67,6 +68,16 @@ UA_StatusCode add_node(OPCUA_Server *server, cJSON *config_node, UA_NodeId paren
     }
 
     if (strcmp(cJSON_GetObjectItem(config_node, "NodeClass")->valuestring, "Object") == 0) {
+        if (strcmp(cJSON_GetObjectItem(config_node, "Communication")->valuestring, "Serial") == 0) {
+            server->modbus_master = modbus_new_rtu(cJSON_GetObjectItem(config_node, "Device")->valuestring,
+                                                   cJSON_GetObjectItem(config_node, "Baud")->valueint,
+                                                   cJSON_GetObjectItem(config_node, "Parity")->valuestring[0],
+                                                   cJSON_GetObjectItem(config_node, "DataBits")->valueint,
+                                                   cJSON_GetObjectItem(config_node, "StopBits")->valueint);
+        } else {
+            printf("Only support serial devices now...\n");
+            return UA_STATUSCODE_BADDECODINGERROR;
+        }
         UA_ObjectAttributes obj_attr = UA_ObjectAttributes_default;
         obj_attr.description = UA_LOCALIZEDTEXT("en-US", cJSON_GetObjectItem(config_node, "Description")->valuestring);
         obj_attr.displayName = UA_LOCALIZEDTEXT("en-US", cJSON_GetObjectItem(config_node, "DisplayName")->valuestring);
@@ -98,7 +109,13 @@ UA_StatusCode add_node(OPCUA_Server *server, cJSON *config_node, UA_NodeId paren
                                   UA_QUALIFIEDNAME(1, cJSON_GetObjectItem(config_node, "QualifiedName")->valuestring),
                                   UA_NODEID_NULL,
                                   var_attr, NULL, NULL);
-        
+
+        // binding read & write callback functions
+        UA_ValueCallback callback;
+	    callback.onRead = before_read;
+	    callback.onWrite = after_write;
+	    UA_Server_setVariableNode_valueCallback(server, this_node_id, callback);
+
     } else {
         assert(0);
     }
@@ -129,10 +146,24 @@ UA_StatusCode start_server(OPCUA_Server *server)
     return status_code;
 }
 
-void on_read(UA_Server *server,
-			 const UA_NodeId *session_id, void *session_context,
-             const UA_NodeId *node_id, void *node_context,
-             const UA_NumericRange *range, const UA_DataValue *data)
+void before_read(UA_Server *server,
+			     const UA_NodeId *session_id, void *session_context,
+                 const UA_NodeId *node_id, void *node_context,
+                 const UA_NumericRange *range, const UA_DataValue *data)
 {
+    UA_Variant value;
+    UA_Double now = 0.1;
+    // TODO: read value from modbus reg
+    UA_Variant_setScalar(&value, &now, &UA_TYPES[UA_TYPES_DOUBLE]);
+    UA_Server_writeValue(server, *node_id, value);
+}
 
+void after_write(UA_Server *server,
+                 const UA_NodeId *session_id, void *session_context,
+                 const UA_NodeId *node_id, void *node_context,
+                 const UA_NumericRange *range, const UA_DataValue *data)
+{
+    double new_value = *(UA_Double *)(data->value.data);
+    // TODO: write value to modbus reg
+    return;
 }

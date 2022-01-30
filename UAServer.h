@@ -12,6 +12,7 @@
 
 #include <cjson/cJSON.h>
 #include <open62541/server.h>
+#include "libmodbus/src/modbus.h"
 
 typedef struct
 {
@@ -20,6 +21,8 @@ typedef struct
     cJSON *config_root;
 
     UA_Server *ua_server;
+    modbus_t *modbus_master;
+
 } OPCUA_Server;
 
 UA_StatusCode init_server(OPCUA_Server *server, UA_UInt16 port, char *config);
