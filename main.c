@@ -3,7 +3,7 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-26 00:14:44
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-01-30 16:22:02
+ * @LastEditTime: 2022-01-30 23:41:28
  */
 
 #include <fcntl.h>
@@ -28,8 +28,7 @@ int main(int argc,char *argv[])
     close(config_fd);
     free(config_stat);
     
-    OPCUA_Server *server = (OPCUA_Server *)malloc(sizeof(OPCUA_Server));
-    init_server(server, config_buf);
-    start_server(server);
+    Server_init(config_buf);
+    Server_start();
     return 0;
 }

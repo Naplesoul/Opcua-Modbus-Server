@@ -1,9 +1,9 @@
 {
-    "Name":"OPCUA Gateway",
+    "Name":"OPCUA Modbus Server",
 	"Version":"1.0",
-	"Author":"SuXin",
-	"Date":"2020-04-25",
-	"Summary":"An example configuration file of OPC UA gateway, reference to https://github.com/suxin1412/modus_gate by shen",
+	"Author":"Shen",
+	"Date":"2022-01-30",
+	"Summary":"An example configuration json file, reference to https://github.com/suxin1412/modus_gate by shen",
 	"Port": 4840,
 	"AddressSpace":[
 		{
