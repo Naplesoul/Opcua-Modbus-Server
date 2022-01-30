@@ -4,6 +4,7 @@
 	"Author":"SuXin",
 	"Date":"2020-04-25",
 	"Summary":"An example configuration file of OPC UA gateway, reference to https://github.com/suxin1412/modus_gate by shen",
+	"Port": 4840,
 	"AddressSpace":[
 		{
 			"NodeID_NamespaceIndex":1,

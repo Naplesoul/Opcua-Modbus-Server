@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(opcua_modbus_server)
 
-add_executable(server main.c)
+add_executable(server UAServer.c main.c)
 
 find_package(open62541 REQUIRED COMPONENTS)
 

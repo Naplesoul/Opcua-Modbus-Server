@@ -3,18 +3,34 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-26 00:12:29
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-01-29 22:33:50
+ * @LastEditTime: 2022-01-30 16:34:43
  */
 #include <open62541/server.h>
+#include <open62541/server_config_default.h>
 #include "libmodbus/src/modbus.h"
 
 #include "UAServer.h"
 
-UA_StatusCode init_server(OPCUA_Server *server, UA_UInt16 port, char *config)
+void before_read(UA_Server *server,
+			     const UA_NodeId *session_id, void *session_context,
+                 const UA_NodeId *node_id, void *node_context,
+                 const UA_NumericRange *range, const UA_DataValue *data);
+void after_write(UA_Server *server,
+                 const UA_NodeId *session_id, void *session_context,
+                 const UA_NodeId *node_id, void *node_context,
+                 const UA_NumericRange *range, const UA_DataValue *data);
+
+
+UA_StatusCode init_server(OPCUA_Server *server, char *config)
 {
-    server->port = port;
-    server->running = false;
     server->config_root = cJSON_Parse(config);
+
+    if (cJSON_HasObjectItem(server->config_root, "Port") == 0)
+		return UA_STATUSCODE_BADDECODINGERROR;
+
+    server->port = cJSON_GetObjectItem(server->config_root, "Port")->valueint;
+
+    server->running = false;
     server->ua_server = UA_Server_new();
     UA_ServerConfig_setMinimal(UA_Server_getConfig(server->ua_server), server->port, NULL);
 
@@ -53,7 +69,7 @@ UA_StatusCode add_node(OPCUA_Server *server, cJSON *config_node, UA_NodeId paren
     } else if (strcmp(cJSON_GetObjectItem(config_node, "NodeID_IDType")->valuestring, "Numeric") == 0) {
         this_node_id = UA_NODEID_NUMERIC(ns_index, cJSON_GetObjectItem(config_node, "NodeID_ID")->valueint);
     } else {
-        assert(0);
+        return UA_STATUSCODE_BADOUTOFRANGE;
     }
 
     UA_NodeId ref_node_id;
@@ -64,7 +80,7 @@ UA_StatusCode add_node(OPCUA_Server *server, cJSON *config_node, UA_NodeId paren
     } else if (strcmp(cJSON_GetObjectItem(config_node, "ReferenceTypeId")->valuestring, "HasProperty") == 0) {
         ref_node_id = UA_NODEID_NUMERIC(0, UA_NS0ID_HASPROPERTY);
     } else {
-        assert(0);
+        return UA_STATUSCODE_BADOUTOFRANGE;
     }
 
     if (strcmp(cJSON_GetObjectItem(config_node, "NodeClass")->valuestring, "Object") == 0) {
@@ -100,7 +116,7 @@ UA_StatusCode add_node(OPCUA_Server *server, cJSON *config_node, UA_NodeId paren
 			*temp = cJSON_GetObjectItem(config_node, "InitialValue")->valuedouble;
 			UA_Variant_setScalar(&var_attr.value, temp, &UA_TYPES[UA_TYPES_DOUBLE]);
         } else {
-            assert(0);
+            return UA_STATUSCODE_BADOUTOFRANGE;
         }
         UA_Server_addVariableNode(server->ua_server,
                                   this_node_id,
@@ -114,10 +130,10 @@ UA_StatusCode add_node(OPCUA_Server *server, cJSON *config_node, UA_NodeId paren
         UA_ValueCallback callback;
 	    callback.onRead = before_read;
 	    callback.onWrite = after_write;
-	    UA_Server_setVariableNode_valueCallback(server, this_node_id, callback);
+	    UA_Server_setVariableNode_valueCallback(server->ua_server, this_node_id, callback);
 
     } else {
-        assert(0);
+        return UA_STATUSCODE_BADOUTOFRANGE;
     }
 
     if (cJSON_HasObjectItem(config_node, "ChildNode")) {
@@ -142,7 +158,7 @@ UA_StatusCode add_node(OPCUA_Server *server, cJSON *config_node, UA_NodeId paren
 UA_StatusCode start_server(OPCUA_Server *server)
 {
     server->running = true;
-    UA_StatusCode status_code = UA_Server_run(server->ua_server, server->running);
+    UA_StatusCode status_code = UA_Server_run(server->ua_server, &server->running);
     return status_code;
 }
 
