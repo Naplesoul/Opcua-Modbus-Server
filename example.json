@@ -1,0 +1,61 @@
+{
+    "Port": 4840,
+    "ModbusRTUs":
+    [
+        {
+            "NodeID_NamespaceIndex": 1,
+			"NodeID_ID": "KFR-35GW",
+            "DisplayName":"Air Conditioner KFR-35GW",
+            "Description":"air conditioner with a temperature sensor",
+            "SerialMode": "RS485",
+			"DeviceLocation": "/dev/ttyUSB0",
+			"MB_MachineAddress": 1,
+			"Baud": 9600,
+			"Parity": "N",
+			"DataBits": 8,
+			"StopBits": 1,
+            "Variables":
+            [
+                {
+                    "NodeID_NamespaceIndex": 1,
+                    "NodeID_ID":"Temp-1",
+                    "DisplayName":"Indoor Temperature Temp-1",
+					"Description":"temperature sensor on the air conditioner",
+                    "VariableType": "CoilStatus",
+                    "MachineAddress": 1,
+					"RegisterAddress": 0
+                },
+                {
+                    "VariableType": "InputStatus",
+                    "MachineAddress": 1,
+					"RegisterAddress": 1
+                },
+                {
+                    "VariableType": "HoldingRegister",
+                    "DataType": "Float",
+                    "ByteOrder": "abcd",
+                    "MachineAddress": 1,
+					"RegisterAddress": 2
+                },
+                {
+                    "VariableType": "InputRegister",
+                    "DataType": "UINT16",
+                    "MachineAddress": 1,
+					"RegisterAddress": 6
+                },
+                {
+                    "VariableType": "HoldingRegister",
+                    "DataType": "UINT32",
+                    "MachineAddress": 1,
+					"RegisterAddress": 8
+                }
+            ]
+        }
+    ],
+    "ModbusTCPs":
+    [
+        {
+
+        }
+    ]
+}

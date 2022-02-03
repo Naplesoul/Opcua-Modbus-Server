@@ -5,7 +5,7 @@
  * @LastEditors: Weihang Shen
  * @LastEditTime: 2022-01-30 22:09:25
  */
-#include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include "HashMap.h"
 
@@ -23,7 +23,7 @@ void List_free(LinkedList *list)
     }
 }
 
-void *List_get(LinkedList *list, u_int32_t key)
+void *List_get(LinkedList *list, uint32_t key)
 {
     while (list) {
         if (list->key == key) {
@@ -34,7 +34,7 @@ void *List_get(LinkedList *list, u_int32_t key)
     return NULL;
 }
 
-void List_put(LinkedList *list, u_int32_t key, void *value)
+void List_put(LinkedList *list, uint32_t key, void *value)
 {
     while (1) {
         if (list->key == key) {
@@ -64,26 +64,26 @@ HashMap *Map_new()
 
 void Map_free(HashMap *map)
 {
-    for (u_int32_t i = 0; i < MAP_SIZE; ++i) {
+    for (uint32_t i = 0; i < MAP_SIZE; ++i) {
         List_free(map->array[i]);
     }
     free(map);
 }
 
-void *Map_get(HashMap *map, u_int32_t key)
+void *Map_get(HashMap *map, uint32_t key)
 {
-    u_int32_t index = key % MAP_SIZE;
+    uint32_t index = key % MAP_SIZE;
     return List_get(map->array[index], key);
 }
 
-void Map_put(HashMap *map, u_int32_t key, void *value)
+void Map_put(HashMap *map, uint32_t key, void *value)
 {
-    u_int32_t index = key % MAP_SIZE;
+    uint32_t index = key % MAP_SIZE;
     if (map->array[index] == NULL) {
         LinkedList *list = (LinkedList *)malloc(sizeof(LinkedList));
         map->array[index] = list;
         list->key = key;
-        list->value = valloc;
+        list->value = value;
         list->next = NULL;
     } else {
         List_put(map->array[index], key, value);
