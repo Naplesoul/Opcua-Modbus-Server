@@ -5,8 +5,9 @@
         {
             "NodeID_NamespaceIndex": 1,
 			"NodeID_ID": "KFR-35GW",
-            "DisplayName":"Air Conditioner KFR-35GW",
-            "Description":"air conditioner with a temperature sensor",
+            "DisplayName": "Air Conditioner KFR-35GW",
+            "Description": "a smart air conditioner with a temperature sensor and a humidity sensor",
+            "QualifiedName": "Air Conditioner",
             "SerialMode": "RS485",
 			"DeviceLocation": "/dev/ttyUSB0",
 			"MB_MachineAddress": 1,
@@ -18,33 +19,56 @@
             [
                 {
                     "NodeID_NamespaceIndex": 1,
-                    "NodeID_ID":"Temp-1",
-                    "DisplayName":"Indoor Temperature Temp-1",
-					"Description":"temperature sensor on the air conditioner",
+                    "NodeID_ID": "Switch-1",
+                    "DisplayName": "Air Conditioner Switch-1",
+					"Description": "a coil value controlling the air conditioner to turn on and off",
+                    "QualifiedName": "Air Conditioner Switch",
                     "VariableType": "CoilStatus",
                     "MachineAddress": 1,
-					"RegisterAddress": 0
+					"RegisterAddress": 0,
+                    "InitialValue": 0
                 },
                 {
+                    "NodeID_NamespaceIndex": 1,
+                    "NodeID_ID": "WIFI-Connected-1",
+                    "DisplayName": "Air Conditioner WIFI-Connected-1",
+					"Description": "a coil value indicating whether the air conditioner is connected to WIFI",
+                    "QualifiedName": "Air Conditioner WIFI Connected",
                     "VariableType": "InputStatus",
                     "MachineAddress": 1,
 					"RegisterAddress": 1
                 },
                 {
+                    "NodeID_NamespaceIndex": 1,
+                    "NodeID_ID": "Temp-1",
+                    "DisplayName": "Setted Temperature Temp-1",
+					"Description": "setted temperature of the air conditioner",
+                    "QualifiedName": "Setted Temperature",
                     "VariableType": "HoldingRegister",
-                    "DataType": "Float",
-                    "ByteOrder": "abcd",
-                    "MachineAddress": 1,
-					"RegisterAddress": 2
-                },
-                {
-                    "VariableType": "InputRegister",
                     "DataType": "UINT16",
                     "MachineAddress": 1,
-					"RegisterAddress": 6
+					"RegisterAddress": 2,
+                    "InitialValue": 25
                 },
                 {
-                    "VariableType": "HoldingRegister",
+                    "NodeID_NamespaceIndex": 1,
+                    "NodeID_ID": "Temp-2",
+                    "DisplayName": "Indoor Temperature Temp-2",
+					"Description": "temperature sensor on the air conditioner",
+                    "QualifiedName": "Indoor Temperature",
+                    "VariableType": "InputRegister",
+                    "DataType": "FLOAT",
+                    "ByteOrder": "abcd",
+                    "MachineAddress": 1,
+					"RegisterAddress": 4
+                },
+                {
+                    "NodeID_NamespaceIndex": 1,
+                    "NodeID_ID": "Humid-1",
+                    "DisplayName": "Indoor Humidity Humid-1",
+					"Description": "humidity sensor on the air conditioner",
+                    "QualifiedName": "Indoor Humidity",
+                    "VariableType": "InputRegister",
                     "DataType": "UINT32",
                     "MachineAddress": 1,
 					"RegisterAddress": 8
