@@ -24,8 +24,8 @@
 					"Description": "a coil value controlling the air conditioner to turn on and off",
                     "QualifiedName": "Air Conditioner Switch",
                     "VariableType": "CoilStatus",
-                    "MachineAddress": 1,
-					"RegisterAddress": 0,
+					"VariableAddress": 0,
+                    "BitOffset": 1,
                     "InitialValue": 0
                 },
                 {
@@ -35,8 +35,8 @@
 					"Description": "a coil value indicating whether the air conditioner is connected to WIFI",
                     "QualifiedName": "Air Conditioner WIFI Connected",
                     "VariableType": "InputStatus",
-                    "MachineAddress": 1,
-					"RegisterAddress": 1
+					"VariableAddress": 1,
+                    "BitOffset": 2
                 },
                 {
                     "NodeID_NamespaceIndex": 1,
@@ -46,8 +46,7 @@
                     "QualifiedName": "Setted Temperature",
                     "VariableType": "HoldingRegister",
                     "DataType": "UINT16",
-                    "MachineAddress": 1,
-					"RegisterAddress": 2,
+					"VariableAddress": 2,
                     "InitialValue": 25
                 },
                 {
@@ -59,8 +58,7 @@
                     "VariableType": "InputRegister",
                     "DataType": "FLOAT",
                     "ByteOrder": "abcd",
-                    "MachineAddress": 1,
-					"RegisterAddress": 4
+					"VariableAddress": 4
                 },
                 {
                     "NodeID_NamespaceIndex": 1,
@@ -70,8 +68,7 @@
                     "QualifiedName": "Indoor Humidity",
                     "VariableType": "InputRegister",
                     "DataType": "UINT32",
-                    "MachineAddress": 1,
-					"RegisterAddress": 8
+					"VariableAddress": 8
                 }
             ]
         }

@@ -3,17 +3,25 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-26 00:14:44
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-01-30 23:41:28
+ * @LastEditTime: 2022-02-06 00:08:24
  */
 
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/stat.h>
 
 #include "log.h"
 #include "UAServer.h"
 
+static void stop(int sig)
+{
+    Server_stop();
+}
+
 int main(int argc,char *argv[])
 {
+    signal(SIGINT, stop);
+    
     int config_fd = open(argv[1], O_RDONLY|O_NDELAY);
     if (config_fd < 0) {
         LOG_ERROR("Fail to open config json file: %s", argv[1]);

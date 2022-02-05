@@ -3,9 +3,10 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-30 21:13:11
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-01-30 22:09:25
+ * @LastEditTime: 2022-02-05 16:46:50
  */
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include "HashMap.h"
 

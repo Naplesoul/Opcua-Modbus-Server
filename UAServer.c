@@ -3,7 +3,7 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-26 00:12:29
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-02-05 01:14:28
+ * @LastEditTime: 2022-02-06 00:10:31
  */
 
 #include <stdlib.h>
@@ -16,8 +16,11 @@
 #include "UAServer.h"
 #include "utils/HashMap.h"
 
-#define CONFIG_ERROR -1
+#define DEFAULT_PORT 4840
+#define BUFFER_SIZE 16
 #define CONFIG_OK 0
+#define CONFIG_ERROR -1
+#define CONNECT_ERROR -2
 
 typedef enum
 {
@@ -34,29 +37,37 @@ typedef struct
     modbus_t *device;
     MB_Variable_Type var_type;
     MB_Data_Type data_type;
-    uint32_t mb_machine_address;
-    uint32_t mb_register_address;
+    uint32_t var_address;
+    uint32_t bit_offset;
 
 } Modbus_Access;
 
 UA_StatusCode Server_init(char *config);
 UA_StatusCode Server_start();
-void Server_beforeRead(UA_Server *server,
+UA_StatusCode Server_stop();
+
+uint32_t Server_getDataByteLength(MB_Data_Type data_type);
+void Server_getVariant(MB_Data_Type data_type, uint16_t *src, UA_Variant *dst);
+void Server_setRegisters(MB_Data_Type data_type, UA_Variant *src, uint16_t *dst);
+
+void UAServer_beforeRead(UA_Server *server,
 			           const UA_NodeId *session_id, void *session_context,
                        const UA_NodeId *node_id, void *node_context,
                        const UA_NumericRange *range, const UA_DataValue *data);
-void Server_afterWrite(UA_Server *server,
+void UAServer_afterWrite(UA_Server *server,
                        const UA_NodeId *session_id, void *session_context,
                        const UA_NodeId *node_id, void *node_context,
                        const UA_NumericRange *range, const UA_DataValue *data);
+
 UA_StatusCode Server_addModbusRTU(cJSON *rtu_config);
 UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_id, modbus_t *device);
+
 UA_StatusCode Server_setVariableType(cJSON *var_config, Modbus_Access *access, UA_VariableAttributes *var_attr);
 UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Access *access, UA_VariableAttributes *var_attr);
 
-/*####################################################################*/
+/*##############################################################################################################################*/
 
-UA_UInt16 port = 4840;
+UA_UInt16 port = 0;
 UA_Boolean running = false;
 cJSON *config_root = NULL;
 UA_Server *ua_server = NULL;
@@ -67,10 +78,11 @@ UA_StatusCode Server_init(char *config)
     config_root = cJSON_Parse(config);
     modbus_access_map = Map_new();
 
-    if (cJSON_HasObjectItem(config_root, "Port") == 0)
-		return CONFIG_ERROR;
-
-    port = cJSON_GetObjectItem(config_root, "Port")->valueint;
+    if (cJSON_HasObjectItem(config_root, "Port") == 0) {
+        port = DEFAULT_PORT;
+    } else {
+        port = cJSON_GetObjectItem(config_root, "Port")->valueint;
+    }
 
     running = false;
     ua_server = UA_Server_new();
@@ -87,7 +99,7 @@ UA_StatusCode Server_init(char *config)
     
 	for (int i = 0; i < rtu_count; ++i) {
         cJSON *rtu_config = cJSON_GetArrayItem(modbus_rtus, i);
-        UA_StatusCode status_code = Server_addNode(rtu_config, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), NULL);
+        UA_StatusCode status_code = Server_addModbusRTU(rtu_config);
         cJSON_Delete(rtu_config);
 		if (status_code != 0) return status_code;
 	}
@@ -103,31 +115,199 @@ UA_StatusCode Server_start()
     return status_code;
 }
 
-void Server_beforeRead(UA_Server *server,
+UA_StatusCode Server_stop()
+{
+    running = false;
+}
+
+uint32_t Server_getDataByteLength(MB_Data_Type data_type)
+{
+    switch (data_type)
+    {
+        case MB_FLOAT_ABCD:
+        case MB_FLOAT_BADC:
+        case MB_FLOAT_CDAB:
+        case MB_FLOAT_DCBA: return 4;
+        case MB_UINT16: return 2;
+        case MB_UINT32: return 4;
+        default: return 2;
+    }
+}
+
+void Server_getVariant(MB_Data_Type data_type, uint16_t *src, UA_Variant *dst)
+{
+    switch (data_type)
+    {
+        case MB_FLOAT_ABCD:
+            {
+                UA_Float new_value = modbus_get_float_abcd(src);
+                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
+            }
+            break;
+        case MB_FLOAT_BADC:
+            {
+                UA_Float new_value = modbus_get_float_badc(src);
+                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
+            }
+            break;
+        case MB_FLOAT_CDAB:
+            {
+                UA_Float new_value = modbus_get_float_cdab(src);
+                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
+            }
+            break;
+        case MB_FLOAT_DCBA:
+            {
+                UA_Float new_value = modbus_get_float_dcba(src);
+                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
+            }
+            break;
+        case MB_UINT16:
+            {
+                UA_UInt16 new_value = *src;
+                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_UINT16]);
+            }
+            break;
+        case MB_UINT32:
+            {
+                UA_UInt32 new_value = ((uint32_t)(src[0]) << 16) | (uint32_t)src[1];
+                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_UINT32]);
+            }
+            break;
+            
+        default:
+            break;
+    }
+}
+
+void Server_setRegisters(MB_Data_Type data_type, UA_Variant *src, uint16_t *dst)
+{
+    switch (data_type)
+    {
+        case MB_FLOAT_ABCD:
+            {
+                float new_value = *(UA_Float *)src;
+                modbus_set_float_abcd(new_value, dst);
+            }
+            break;
+        case MB_FLOAT_BADC:
+            {
+                float new_value = *(UA_Float *)src;
+                modbus_set_float_badc(new_value, dst);
+            }
+            break;
+        case MB_FLOAT_CDAB:
+            {
+                float new_value = *(UA_Float *)src;
+                modbus_set_float_cdab(new_value, dst);
+            }
+            break;
+        case MB_FLOAT_DCBA:
+            {
+                float new_value = *(UA_Float *)src;
+                modbus_set_float_dcba(new_value, dst);
+            }
+            break;
+        case MB_UINT16:
+            {
+                dst[0] = *(UA_UInt16 *)src;
+            }
+            break;
+        case MB_UINT32:
+            {
+                uint32_t new_value = *(UA_UInt32 *)src;
+                dst[0] = new_value >> 16;
+                dst[1] = new_value;
+            }
+            break;
+            
+        default:
+            break;
+    }
+}
+
+void UAServer_beforeRead(UA_Server *server,
 			           const UA_NodeId *session_id, void *session_context,
                        const UA_NodeId *node_id, void *node_context,
                        const UA_NumericRange *range, const UA_DataValue *data)
 {
     UA_Variant value;
-    u_int16_t new_value;
     // TODO: read value from modbus reg
     Modbus_Access *access = (Modbus_Access *)Map_get(modbus_access_map, UA_NodeId_hash(node_id));
-    modbus_read_registers(access->device, access->mb_register_address, 1, &new_value);
-    UA_Double now = new_value;
-    UA_Variant_setScalar(&value, &now, &UA_TYPES[UA_TYPES_DOUBLE]);
+    int ret = 0;
+    
+    switch (access->var_type)
+    {
+    case MB_COIL_STATUS:
+        {
+            uint8_t buf[BUFFER_SIZE];
+            ret = modbus_read_bits(access->device, access->var_address, access->bit_offset + 1, buf);
+            UA_Boolean new_value = buf[access->bit_offset];
+            UA_Variant_setScalar(&value, &new_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        }
+        break;
+    case MB_INPUT_STATUS:
+        {
+            uint8_t buf[BUFFER_SIZE];
+            ret = modbus_read_input_bits(access->device, access->var_address, access->bit_offset + 1, buf);
+            UA_Boolean new_value = buf[access->bit_offset];
+            UA_Variant_setScalar(&value, &new_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        }
+        break;
+    case MB_HOLDING_REGISTER:
+        {
+            uint16_t buf[BUFFER_SIZE];
+            ret = modbus_read_registers(access->device, access->var_address, Server_getDataByteLength(access->data_type) / 2, buf);
+            Server_getVariant(access->data_type, buf, &value);
+        }
+        break;
+    
+    case MB_INPUT_REGISTER:
+        {
+            uint16_t buf[BUFFER_SIZE];
+            ret = modbus_read_input_registers(access->device, access->var_address, Server_getDataByteLength(access->data_type) / 2, buf);
+            Server_getVariant(access->data_type, buf, &value);
+        }
+        break;
+    default:
+        break;
+    }
+
+    if (ret == -1) {
+        // TODO: log read error
+        return;
+    }
+
     UA_Server_writeValue(server, *node_id, value);
 }
 
-void Server_afterWrite(UA_Server *server,
+void UAServer_afterWrite(UA_Server *server,
                        const UA_NodeId *session_id, void *session_context,
                        const UA_NodeId *node_id, void *node_context,
                        const UA_NumericRange *range, const UA_DataValue *data)
 {
-    double new_value = *(UA_Double *)(data->value.data);
-    // TODO: write value to modbus reg
     Modbus_Access *access = (Modbus_Access *)Map_get(modbus_access_map, UA_NodeId_hash(node_id));
-    modbus_write_register(access->device, access->mb_register_address, new_value);
-    return;
+    int ret = 0;
+
+    switch (access->var_type)
+    {
+    case MB_COIL_STATUS:
+        {
+            uint8_t buf[BUFFER_SIZE];
+            int new_value = *(UA_Boolean *)(data->value.data);
+            ret = modbus_write_bit(access->device, access->var_address, new_value);
+        }
+        break;
+    case MB_HOLDING_REGISTER:
+        {
+            uint16_t buf[BUFFER_SIZE];
+            Server_setRegisters(access->data_type, data->value.data, buf);
+            ret = modbus_write_registers(access->device, access->var_address, Server_getDataByteLength(access->data_type) / 2, buf);
+        }
+    default:
+        // TODO: Log error, cannot write input regs
+        break;
+    }
 }
 
 UA_StatusCode Server_addModbusRTU(cJSON *rtu_config)
@@ -149,6 +329,9 @@ UA_StatusCode Server_addModbusRTU(cJSON *rtu_config)
     } else {
         return CONFIG_ERROR;
     }
+
+    int machine_address = cJSON_GetObjectItem(rtu_config, "MB_MachineAddress")->valueint;
+    modbus_set_slave(modbus_rtu, machine_address);
 
     UA_ObjectAttributes obj_attr = UA_ObjectAttributes_default;
     obj_attr.description = UA_LOCALIZEDTEXT("en-US", cJSON_GetObjectItem(rtu_config, "Description")->valuestring);
@@ -175,6 +358,9 @@ UA_StatusCode Server_addModbusRTU(cJSON *rtu_config)
         }
         cJSON_Delete(variables);
     }
+
+    if (modbus_connect(modbus_rtu) != 0) return CONNECT_ERROR;
+
     return CONFIG_OK;
 }
 
@@ -190,13 +376,13 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
     
     Modbus_Access *access = (Modbus_Access *)malloc(sizeof(Modbus_Access));
     access->device = device;
-    access->mb_machine_address = cJSON_GetObjectItem(var_config, "MB_MachineAddress")->valueint;
-    access->mb_register_address = cJSON_GetObjectItem(var_config, "MB_RegisterAddress")->valueint;
+    access->var_address = cJSON_GetObjectItem(var_config, "VariableAddress")->valueint;
     char *variable_type = cJSON_GetObjectItem(var_config, "VariableType")->valuestring;
 
     if (strcmp(variable_type, "CoilStatus") == 0) {
         access->var_type = MB_COIL_STATUS;
         access->data_type = MB_BOOLEAN;
+        access->bit_offset = cJSON_GetObjectItem(var_config, "BitOffset")->valueint;
         var_attr.dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_BOOLEAN);
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
             UA_Boolean init_value = cJSON_GetObjectItem(var_config, "InitialValue")->valueint;
@@ -205,6 +391,7 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
     } else if (strcmp(variable_type, "InputStatus") == 0) {
         access->var_type = MB_INPUT_STATUS;
         access->data_type = MB_BOOLEAN;
+        access->bit_offset = cJSON_GetObjectItem(var_config, "BitOffset")->valueint;
         var_attr.dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_BOOLEAN);
         // TODO: Set variable READ_ONLY
         // var_attr.userWriteMask = ?;
@@ -233,8 +420,8 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
     Map_put(modbus_access_map, UA_NodeId_hash(&this_node_id), access);
     // binding read & write callback functions
     UA_ValueCallback callback;
-	callback.onRead = Server_beforeRead;
-	callback.onWrite = Server_afterWrite;
+	callback.onRead = UAServer_beforeRead;
+	callback.onWrite = UAServer_afterWrite;
 	UA_Server_setVariableNode_valueCallback(ua_server, this_node_id, callback);
 
     return CONFIG_OK;
