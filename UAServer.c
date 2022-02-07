@@ -3,7 +3,7 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-26 00:12:29
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-02-06 00:10:31
+ * @LastEditTime: 2022-02-07 14:02:49
  */
 
 #include <stdlib.h>
@@ -45,6 +45,7 @@ typedef struct
 UA_StatusCode Server_init(char *config);
 UA_StatusCode Server_start();
 UA_StatusCode Server_stop();
+UA_StatusCode Server_free();
 
 uint32_t Server_getDataByteLength(MB_Data_Type data_type);
 void Server_getVariant(MB_Data_Type data_type, uint16_t *src, UA_Variant *dst);
@@ -118,6 +119,19 @@ UA_StatusCode Server_start()
 UA_StatusCode Server_stop()
 {
     running = false;
+}
+
+void Server_freeModbus(void *access)
+{
+    modbus_t *device = ((Modbus_Access *)access)->device;
+    modbus_free(device);
+}
+
+UA_StatusCode Server_free()
+{
+    Map_free(modbus_access_map, Server_freeModbus);
+    cJSON_free(config_root);
+    UA_Server_delete(ua_server);
 }
 
 uint32_t Server_getDataByteLength(MB_Data_Type data_type)

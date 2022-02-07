@@ -3,21 +3,23 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-30 21:13:11
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-02-05 16:46:50
+ * @LastEditTime: 2022-02-07 14:03:22
  */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "HashMap.h"
 
-void List_free(LinkedList *list)
+void List_free(LinkedList *list, void *free_func(void *))
 {
     while (list) {
         if (list->next) {
             LinkedList *next = list->next;
+            free_func(list->value);
             free(list);
             list = next;
         } else {
+            free_func(list->value);
             free(list);
             return;
         }
@@ -63,10 +65,10 @@ HashMap *Map_new()
     memset(map, 0, sizeof(HashMap));
 }
 
-void Map_free(HashMap *map)
+void Map_free(HashMap *map, void *free_func(void *))
 {
     for (uint32_t i = 0; i < MAP_SIZE; ++i) {
-        List_free(map->array[i]);
+        List_free(map->array[i], free_func);
     }
     free(map);
 }
