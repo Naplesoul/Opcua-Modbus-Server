@@ -3,14 +3,14 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-30 21:13:11
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-02-07 14:03:22
+ * @LastEditTime: 2022-02-07 14:28:26
  */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "HashMap.h"
 
-void List_free(LinkedList *list, void *free_func(void *))
+void List_free(LinkedList *list, void free_func(void *))
 {
     while (list) {
         if (list->next) {
@@ -65,7 +65,7 @@ HashMap *Map_new()
     memset(map, 0, sizeof(HashMap));
 }
 
-void Map_free(HashMap *map, void *free_func(void *))
+void Map_free(HashMap *map, void free_func(void *))
 {
     for (uint32_t i = 0; i < MAP_SIZE; ++i) {
         List_free(map->array[i], free_func);

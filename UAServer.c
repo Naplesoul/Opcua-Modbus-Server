@@ -3,7 +3,7 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-26 00:12:29
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-02-07 14:02:49
+ * @LastEditTime: 2022-02-07 14:26:24
  */
 
 #include <stdlib.h>
@@ -21,6 +21,11 @@
 #define CONFIG_OK 0
 #define CONFIG_ERROR -1
 #define CONNECT_ERROR -2
+
+typedef enum
+{
+    MB_SERIAL, MB_TCP
+} MB_CONNECTION_TYPE;
 
 typedef enum
 {
@@ -46,6 +51,7 @@ UA_StatusCode Server_init(char *config);
 UA_StatusCode Server_start();
 UA_StatusCode Server_stop();
 UA_StatusCode Server_free();
+void Server_freeModbus(void *access);
 
 uint32_t Server_getDataByteLength(MB_Data_Type data_type);
 void Server_getVariant(MB_Data_Type data_type, uint16_t *src, UA_Variant *dst);
@@ -60,7 +66,7 @@ void UAServer_afterWrite(UA_Server *server,
                        const UA_NodeId *node_id, void *node_context,
                        const UA_NumericRange *range, const UA_DataValue *data);
 
-UA_StatusCode Server_addModbusRTU(cJSON *rtu_config);
+UA_StatusCode Server_addModbusDevice(cJSON *device_config, MB_CONNECTION_TYPE connection_type);
 UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_id, modbus_t *device);
 
 UA_StatusCode Server_setVariableType(cJSON *var_config, Modbus_Access *access, UA_VariableAttributes *var_attr);
@@ -88,24 +94,41 @@ UA_StatusCode Server_init(char *config)
     running = false;
     ua_server = UA_Server_new();
     UA_ServerConfig_setMinimal(UA_Server_getConfig(ua_server), port, NULL);
+    
+    if (cJSON_HasObjectItem(config_root, "ModbusRTUs")) {
+        cJSON *modbus_rtus = cJSON_GetObjectItem(config_root, "ModbusRTUs");
+        int rtu_count = cJSON_GetArraySize(modbus_rtus);
 
-    if (cJSON_HasObjectItem(config_root, "ModbusRTUs") == 0)
-		return CONFIG_ERROR;
+        if (rtu_count <= 0)
+            return CONFIG_ERROR;
+        
+        for (int i = 0; i < rtu_count; ++i) {
+            cJSON *rtu_config = cJSON_GetArrayItem(modbus_rtus, i);
+            UA_StatusCode status_code = Server_addModbusDevice(rtu_config, MB_SERIAL);
+            cJSON_Delete(rtu_config);
+            if (status_code != 0) return status_code;
+        }
+        
+        cJSON_Delete(modbus_rtus);
+    }
     
-	cJSON *modbus_rtus = cJSON_GetObjectItem(config_root, "ModbusRTUs");
-	int rtu_count = cJSON_GetArraySize(modbus_rtus);
+    if (cJSON_HasObjectItem(config_root, "ModbusTCPs")) {
+        cJSON *modbus_tcps = cJSON_GetObjectItem(config_root, "ModbusTCPs");
+        int tcp_count = cJSON_GetArraySize(modbus_tcps);
 
-	if (rtu_count <= 0)
-		return CONFIG_ERROR;
-    
-	for (int i = 0; i < rtu_count; ++i) {
-        cJSON *rtu_config = cJSON_GetArrayItem(modbus_rtus, i);
-        UA_StatusCode status_code = Server_addModbusRTU(rtu_config);
-        cJSON_Delete(rtu_config);
-		if (status_code != 0) return status_code;
-	}
-    
-	cJSON_Delete(modbus_rtus);
+        if (tcp_count <= 0)
+            return CONFIG_ERROR;
+        
+        for (int i = 0; i < tcp_count; ++i) {
+            cJSON *rtu_config = cJSON_GetArrayItem(modbus_tcps, i);
+            UA_StatusCode status_code = Server_addModbusDevice(rtu_config, MB_TCP);
+            cJSON_Delete(rtu_config);
+            if (status_code != 0) return status_code;
+        }
+        
+        cJSON_Delete(modbus_tcps);
+    }
+	
 	return 0;
 }
 
@@ -324,46 +347,53 @@ void UAServer_afterWrite(UA_Server *server,
     }
 }
 
-UA_StatusCode Server_addModbusRTU(cJSON *rtu_config)
+UA_StatusCode Server_addModbusDevice(cJSON *device_config, MB_CONNECTION_TYPE connection_type)
 {
-    int ns_index = cJSON_GetObjectItem(rtu_config, "NodeID_NamespaceIndex")->valueint;
-    UA_NodeId this_node_id = UA_NODEID_STRING(ns_index, cJSON_GetObjectItem(rtu_config, "NodeID_ID")->valuestring);
+    int ns_index = cJSON_GetObjectItem(device_config, "NodeID_NamespaceIndex")->valueint;
+    UA_NodeId this_node_id = UA_NODEID_STRING(ns_index, cJSON_GetObjectItem(device_config, "NodeID_ID")->valuestring);
     UA_NodeId ref_node_id = UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES);
 
-    modbus_t *modbus_rtu = modbus_new_rtu(cJSON_GetObjectItem(rtu_config, "Device")->valuestring,
-                                          cJSON_GetObjectItem(rtu_config, "Baud")->valueint,
-                                          cJSON_GetObjectItem(rtu_config, "Parity")->valuestring[0],
-                                          cJSON_GetObjectItem(rtu_config, "DataBits")->valueint,
-                                          cJSON_GetObjectItem(rtu_config, "StopBits")->valueint);
+    modbus_t *modbus_device = NULL;
 
-    if (strcmp(cJSON_GetObjectItem(rtu_config, "SerialMode")->valuestring, "RS485") == 0) {
-        modbus_rtu_set_serial_mode(modbus_rtu, MODBUS_RTU_RS485);
-    } else if (strcmp(cJSON_GetObjectItem(rtu_config, "SerialMode")->valuestring, "RS232") == 0) {
-        modbus_rtu_set_serial_mode(modbus_rtu, MODBUS_RTU_RS232);
-    } else {
-        return CONFIG_ERROR;
+    if (connection_type == MB_SERIAL) {
+        modbus_device = modbus_new_rtu(cJSON_GetObjectItem(device_config, "Device")->valuestring,
+                                       cJSON_GetObjectItem(device_config, "Baud")->valueint,
+                                       cJSON_GetObjectItem(device_config, "Parity")->valuestring[0],
+                                       cJSON_GetObjectItem(device_config, "DataBits")->valueint,
+                                       cJSON_GetObjectItem(device_config, "StopBits")->valueint);
+
+        if (strcmp(cJSON_GetObjectItem(device_config, "SerialMode")->valuestring, "RS485") == 0) {
+            modbus_rtu_set_serial_mode(modbus_device, MODBUS_RTU_RS485);
+        } else if (strcmp(cJSON_GetObjectItem(device_config, "SerialMode")->valuestring, "RS232") == 0) {
+            modbus_rtu_set_serial_mode(modbus_device, MODBUS_RTU_RS232);
+        } else {
+            return CONFIG_ERROR;
+        }
+    } else if (connection_type == MB_TCP) {
+        modbus_device = modbus_new_tcp(cJSON_GetObjectItem(device_config, "IP")->valuestring,
+                                       cJSON_GetObjectItem(device_config, "Port")->valueint);
     }
 
-    int machine_address = cJSON_GetObjectItem(rtu_config, "MB_MachineAddress")->valueint;
-    modbus_set_slave(modbus_rtu, machine_address);
+    int machine_address = cJSON_GetObjectItem(device_config, "MB_MachineAddress")->valueint;
+    modbus_set_slave(modbus_device, machine_address);
 
     UA_ObjectAttributes obj_attr = UA_ObjectAttributes_default;
-    obj_attr.description = UA_LOCALIZEDTEXT("en-US", cJSON_GetObjectItem(rtu_config, "Description")->valuestring);
-    obj_attr.displayName = UA_LOCALIZEDTEXT("en-US", cJSON_GetObjectItem(rtu_config, "DisplayName")->valuestring);
+    obj_attr.description = UA_LOCALIZEDTEXT("en-US", cJSON_GetObjectItem(device_config, "Description")->valuestring);
+    obj_attr.displayName = UA_LOCALIZEDTEXT("en-US", cJSON_GetObjectItem(device_config, "DisplayName")->valuestring);
     UA_Server_addObjectNode(ua_server, this_node_id,
                             UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
                             ref_node_id,
-                            UA_QUALIFIEDNAME(1, cJSON_GetObjectItem(rtu_config, "QualifiedName")->valuestring),
+                            UA_QUALIFIEDNAME(1, cJSON_GetObjectItem(device_config, "QualifiedName")->valuestring),
                             UA_NODEID_NULL,
                             obj_attr, NULL, NULL);
 
-    if (cJSON_HasObjectItem(rtu_config, "Variables")) {
-        cJSON *variables = cJSON_GetObjectItem(rtu_config, "Variables");
+    if (cJSON_HasObjectItem(device_config, "Variables")) {
+        cJSON *variables = cJSON_GetObjectItem(device_config, "Variables");
         int var_count = cJSON_GetArraySize(variables);
 
         for (int i = 0; i < var_count; ++i) {
             cJSON *var_config = cJSON_GetArrayItem(variables, i);
-            UA_StatusCode status_code = Server_addModbusVariable(var_config, this_node_id, modbus_rtu);
+            UA_StatusCode status_code = Server_addModbusVariable(var_config, this_node_id, modbus_device);
             cJSON_Delete(var_config);
             if (status_code < 0) {
                 cJSON_Delete(variables);
@@ -373,9 +403,14 @@ UA_StatusCode Server_addModbusRTU(cJSON *rtu_config)
         cJSON_Delete(variables);
     }
 
-    if (modbus_connect(modbus_rtu) != 0) return CONNECT_ERROR;
+    if (modbus_connect(modbus_device) != 0) return CONNECT_ERROR;
 
     return CONFIG_OK;
+}
+
+UA_StatusCode Server_addModbusTCP(cJSON *rtu_config)
+{
+    
 }
 
 UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_id, modbus_t *device)

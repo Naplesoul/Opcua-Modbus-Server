@@ -76,7 +76,14 @@
     "ModbusTCPs":
     [
         {
-
+            "NodeID_NamespaceIndex": 1,
+			"NodeID_ID": "KFR-35GW-2",
+            "DisplayName": "Air Conditioner KFR-35GW-2",
+            "Description": "a smart air conditioner with a temperature sensor and a humidity sensor",
+            "QualifiedName": "Air Conditioner",
+			"MB_MachineAddress": 1,
+            "IP": "192.168.0.2",
+            "Port": 5502
         }
     ]
 }

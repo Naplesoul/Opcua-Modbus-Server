@@ -3,7 +3,7 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-30 21:13:02
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-02-07 13:56:47
+ * @LastEditTime: 2022-02-07 14:28:16
  */
 #ifndef HASHMAP_H
 #define HASHMAP_H
@@ -26,7 +26,7 @@ typedef struct
 } HashMap;
 
 HashMap *Map_new();
-void Map_free(HashMap *map, void *free_func(void *));
+void Map_free(HashMap *map, void free_func(void *));
 void *Map_get(HashMap *map, uint32_t key);
 void Map_put(HashMap *map, uint32_t key, void *value);
 

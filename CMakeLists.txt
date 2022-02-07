@@ -14,7 +14,7 @@ include_directories(
     ./libmodbus
     ./libmodbus/src/
 )
-add_library(libmodbus SHARED
+add_library(modbus SHARED
     ./libmodbus/src/modbus-data.c
     ./libmodbus/src/modbus-tcp.c
     ./libmodbus/src/modbus-rtu.c
@@ -24,5 +24,5 @@ add_library(libmodbus SHARED
 target_link_libraries(server
     ${CJSON_LIBRARIES}
     open62541::open62541
-    libmodbus
+    modbus
 )
