@@ -1,10 +1,10 @@
 {
     "Port": 4840,
-    "ModbusRTUs":
+    "disabled,ModbusRTUs":
     [
         {
-            "NodeID_NamespaceIndex": 1,
-			"NodeID_ID": "KFR-35GW",
+            "NamespaceIndex": 1,
+			"NodeID": "KFR-35GW",
             "DisplayName": "Air Conditioner KFR-35GW",
             "Description": "a smart air conditioner with a temperature sensor and a humidity sensor",
             "QualifiedName": "Air Conditioner",
@@ -18,8 +18,8 @@
             "Variables":
             [
                 {
-                    "NodeID_NamespaceIndex": 1,
-                    "NodeID_ID": "Switch-1",
+                    "NamespaceIndex": 1,
+                    "NodeID": "Switch-1",
                     "DisplayName": "Air Conditioner Switch-1",
 					"Description": "a coil value controlling the air conditioner to turn on and off",
                     "QualifiedName": "Air Conditioner Switch",
@@ -29,8 +29,8 @@
                     "InitialValue": 0
                 },
                 {
-                    "NodeID_NamespaceIndex": 1,
-                    "NodeID_ID": "WIFI-Connected-1",
+                    "NamespaceIndex": 1,
+                    "NodeID": "WIFI-Connected-1",
                     "DisplayName": "Air Conditioner WIFI-Connected-1",
 					"Description": "a coil value indicating whether the air conditioner is connected to WIFI",
                     "QualifiedName": "Air Conditioner WIFI Connected",
@@ -39,8 +39,8 @@
                     "BitOffset": 2
                 },
                 {
-                    "NodeID_NamespaceIndex": 1,
-                    "NodeID_ID": "Temp-1",
+                    "NamespaceIndex": 1,
+                    "NodeID": "Temp-1",
                     "DisplayName": "Setted Temperature Temp-1",
 					"Description": "setted temperature of the air conditioner",
                     "QualifiedName": "Setted Temperature",
@@ -50,8 +50,8 @@
                     "InitialValue": 25
                 },
                 {
-                    "NodeID_NamespaceIndex": 1,
-                    "NodeID_ID": "Temp-2",
+                    "NamespaceIndex": 1,
+                    "NodeID": "Temp-2",
                     "DisplayName": "Indoor Temperature Temp-2",
 					"Description": "temperature sensor on the air conditioner",
                     "QualifiedName": "Indoor Temperature",
@@ -61,8 +61,8 @@
 					"VariableAddress": 4
                 },
                 {
-                    "NodeID_NamespaceIndex": 1,
-                    "NodeID_ID": "Humid-1",
+                    "NamespaceIndex": 1,
+                    "NodeID": "Humid-1",
                     "DisplayName": "Indoor Humidity Humid-1",
 					"Description": "humidity sensor on the air conditioner",
                     "QualifiedName": "Indoor Humidity",
@@ -76,14 +76,70 @@
     "ModbusTCPs":
     [
         {
-            "NodeID_NamespaceIndex": 1,
-			"NodeID_ID": "KFR-35GW-2",
+            "NamespaceIndex": 1,
+			"NodeID": "KFR-35GW-2",
             "DisplayName": "Air Conditioner KFR-35GW-2",
             "Description": "a smart air conditioner with a temperature sensor and a humidity sensor",
             "QualifiedName": "Air Conditioner",
 			"MB_MachineAddress": 1,
-            "IP": "192.168.0.2",
-            "Port": 5502
+            "IP": "127.0.0.1",
+            "Port": 5502,
+            "Variables":
+            [
+                {
+                    "NamespaceIndex": 1,
+                    "NodeID": "Switch-1",
+                    "DisplayName": "Air Conditioner Switch-1",
+					"Description": "a coil value controlling the air conditioner to turn on and off",
+                    "QualifiedName": "Air Conditioner Switch",
+                    "VariableType": "CoilStatus",
+					"VariableAddress": 0,
+                    "BitOffset": 0,
+                    "InitialValue": 1
+                },
+                {
+                    "NamespaceIndex": 1,
+                    "NodeID": "WIFI-Connected-1",
+                    "DisplayName": "Air Conditioner WIFI-Connected-1",
+					"Description": "a coil value indicating whether the air conditioner is connected to WIFI",
+                    "QualifiedName": "Air Conditioner WIFI Connected",
+                    "VariableType": "InputStatus",
+					"VariableAddress": 10000,
+                    "BitOffset": 0
+                },
+                {
+                    "NamespaceIndex": 1,
+                    "NodeID": "Temp-1",
+                    "DisplayName": "Setted Temperature Temp-1",
+					"Description": "setted temperature of the air conditioner",
+                    "QualifiedName": "Setted Temperature",
+                    "VariableType": "HoldingRegister",
+                    "DataType": "UINT16",
+					"VariableAddress": 40000,
+                    "InitialValue": 26
+                },
+                {
+                    "NamespaceIndex": 1,
+                    "NodeID": "Temp-2",
+                    "DisplayName": "Indoor Temperature Temp-2",
+					"Description": "temperature sensor on the air conditioner",
+                    "QualifiedName": "Indoor Temperature",
+                    "VariableType": "InputRegister",
+                    "DataType": "FLOAT",
+                    "ByteOrder": "abcd",
+					"VariableAddress": 20000
+                },
+                {
+                    "NamespaceIndex": 1,
+                    "NodeID": "Humid-1",
+                    "DisplayName": "Indoor Humidity Humid-1",
+					"Description": "humidity sensor on the air conditioner",
+                    "QualifiedName": "Indoor Humidity",
+                    "VariableType": "InputRegister",
+                    "DataType": "UINT32",
+					"VariableAddress": 20004
+                }
+            ]
         }
     ]
 }

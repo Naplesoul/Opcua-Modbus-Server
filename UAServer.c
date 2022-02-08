@@ -3,7 +3,7 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-26 00:12:29
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-02-07 14:26:24
+ * @LastEditTime: 2022-02-09 02:03:21
  */
 
 #include <stdlib.h>
@@ -11,6 +11,7 @@
 #include <cjson/cJSON.h>
 #include <open62541/server.h>
 #include <open62541/server_config_default.h>
+#include <open62541/plugin/log_stdout.h>
 #include "libmodbus/src/modbus.h"
 
 #include "UAServer.h"
@@ -50,7 +51,7 @@ typedef struct
 UA_StatusCode Server_init(char *config);
 UA_StatusCode Server_start();
 UA_StatusCode Server_stop();
-UA_StatusCode Server_free();
+UA_StatusCode Server();
 void Server_freeModbus(void *access);
 
 uint32_t Server_getDataByteLength(MB_Data_Type data_type);
@@ -105,11 +106,8 @@ UA_StatusCode Server_init(char *config)
         for (int i = 0; i < rtu_count; ++i) {
             cJSON *rtu_config = cJSON_GetArrayItem(modbus_rtus, i);
             UA_StatusCode status_code = Server_addModbusDevice(rtu_config, MB_SERIAL);
-            cJSON_Delete(rtu_config);
             if (status_code != 0) return status_code;
         }
-        
-        cJSON_Delete(modbus_rtus);
     }
     
     if (cJSON_HasObjectItem(config_root, "ModbusTCPs")) {
@@ -122,11 +120,8 @@ UA_StatusCode Server_init(char *config)
         for (int i = 0; i < tcp_count; ++i) {
             cJSON *rtu_config = cJSON_GetArrayItem(modbus_tcps, i);
             UA_StatusCode status_code = Server_addModbusDevice(rtu_config, MB_TCP);
-            cJSON_Delete(rtu_config);
             if (status_code != 0) return status_code;
         }
-        
-        cJSON_Delete(modbus_tcps);
     }
 	
 	return 0;
@@ -141,13 +136,15 @@ UA_StatusCode Server_start()
 
 UA_StatusCode Server_stop()
 {
+    UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Stopping...");
     running = false;
 }
 
 void Server_freeModbus(void *access)
 {
     modbus_t *device = ((Modbus_Access *)access)->device;
-    modbus_free(device);
+    modbus_close(device);
+    free(access);
 }
 
 UA_StatusCode Server_free()
@@ -268,8 +265,10 @@ void UAServer_beforeRead(UA_Server *server,
                        const UA_NodeId *node_id, void *node_context,
                        const UA_NumericRange *range, const UA_DataValue *data)
 {
+    // return;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Reading data...");
     UA_Variant value;
-    // TODO: read value from modbus reg
+    // read value from modbus reg
     Modbus_Access *access = (Modbus_Access *)Map_get(modbus_access_map, UA_NodeId_hash(node_id));
     int ret = 0;
     
@@ -311,7 +310,7 @@ void UAServer_beforeRead(UA_Server *server,
     }
 
     if (ret == -1) {
-        // TODO: log read error
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Fail to read data");
         return;
     }
 
@@ -323,6 +322,8 @@ void UAServer_afterWrite(UA_Server *server,
                        const UA_NodeId *node_id, void *node_context,
                        const UA_NumericRange *range, const UA_DataValue *data)
 {
+    // return;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Writing data...");
     Modbus_Access *access = (Modbus_Access *)Map_get(modbus_access_map, UA_NodeId_hash(node_id));
     int ret = 0;
 
@@ -342,15 +343,20 @@ void UAServer_afterWrite(UA_Server *server,
             ret = modbus_write_registers(access->device, access->var_address, Server_getDataByteLength(access->data_type) / 2, buf);
         }
     default:
-        // TODO: Log error, cannot write input regs
+        UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Cannot write INPUT data READ-ONLY");
         break;
+    }
+
+    if (ret == -1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Fail to write data");
+        return;
     }
 }
 
 UA_StatusCode Server_addModbusDevice(cJSON *device_config, MB_CONNECTION_TYPE connection_type)
 {
-    int ns_index = cJSON_GetObjectItem(device_config, "NodeID_NamespaceIndex")->valueint;
-    UA_NodeId this_node_id = UA_NODEID_STRING(ns_index, cJSON_GetObjectItem(device_config, "NodeID_ID")->valuestring);
+    int ns_index = cJSON_GetObjectItem(device_config, "NamespaceIndex")->valueint;
+    UA_NodeId this_node_id = UA_NODEID_STRING(ns_index, cJSON_GetObjectItem(device_config, "NodeID")->valuestring);
     UA_NodeId ref_node_id = UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES);
 
     modbus_t *modbus_device = NULL;
@@ -383,8 +389,8 @@ UA_StatusCode Server_addModbusDevice(cJSON *device_config, MB_CONNECTION_TYPE co
     UA_Server_addObjectNode(ua_server, this_node_id,
                             UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
                             ref_node_id,
-                            UA_QUALIFIEDNAME(1, cJSON_GetObjectItem(device_config, "QualifiedName")->valuestring),
-                            UA_NODEID_NULL,
+                            UA_QUALIFIEDNAME(ns_index, cJSON_GetObjectItem(device_config, "QualifiedName")->valuestring),
+                            UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE),
                             obj_attr, NULL, NULL);
 
     if (cJSON_HasObjectItem(device_config, "Variables")) {
@@ -394,29 +400,26 @@ UA_StatusCode Server_addModbusDevice(cJSON *device_config, MB_CONNECTION_TYPE co
         for (int i = 0; i < var_count; ++i) {
             cJSON *var_config = cJSON_GetArrayItem(variables, i);
             UA_StatusCode status_code = Server_addModbusVariable(var_config, this_node_id, modbus_device);
-            cJSON_Delete(var_config);
             if (status_code < 0) {
-                cJSON_Delete(variables);
                 return status_code;
             }
         }
-        cJSON_Delete(variables);
     }
 
-    if (modbus_connect(modbus_device) != 0) return CONNECT_ERROR;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Trying to connect to Modbus device...");
+    if (modbus_connect(modbus_device) != 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Connection fail");
+        return CONNECT_ERROR;
+    }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Connected");
 
     return CONFIG_OK;
 }
 
-UA_StatusCode Server_addModbusTCP(cJSON *rtu_config)
-{
-    
-}
-
 UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_id, modbus_t *device)
 {
-    int ns_index = cJSON_GetObjectItem(var_config, "NodeID_NamespaceIndex")->valueint;
-    UA_NodeId this_node_id = UA_NODEID_STRING(ns_index, cJSON_GetObjectItem(var_config, "NodeID_ID")->valuestring);
+    int ns_index = cJSON_GetObjectItem(var_config, "NamespaceIndex")->valueint;
+    UA_NodeId this_node_id = UA_NODEID_STRING(ns_index, cJSON_GetObjectItem(var_config, "NodeID")->valuestring);
     UA_NodeId ref_node_id = UA_NODEID_NUMERIC(0, UA_NS0ID_HASPROPERTY);
 
     UA_VariableAttributes var_attr = UA_VariableAttributes_default;
@@ -433,27 +436,42 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
         access->data_type = MB_BOOLEAN;
         access->bit_offset = cJSON_GetObjectItem(var_config, "BitOffset")->valueint;
         var_attr.dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_BOOLEAN);
+
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
             UA_Boolean init_value = cJSON_GetObjectItem(var_config, "InitialValue")->valueint;
             UA_Variant_setScalar(&var_attr.value, &init_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        } else {
+            UA_Boolean init_value = 0;
+            UA_Variant_setScalar(&var_attr.value, &init_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
         }
+
+        var_attr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
+
     } else if (strcmp(variable_type, "InputStatus") == 0) {
         access->var_type = MB_INPUT_STATUS;
         access->data_type = MB_BOOLEAN;
         access->bit_offset = cJSON_GetObjectItem(var_config, "BitOffset")->valueint;
         var_attr.dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_BOOLEAN);
-        // TODO: Set variable READ_ONLY
-        // var_attr.userWriteMask = ?;
+
+        UA_Boolean init_value = 0;
+        UA_Variant_setScalar(&var_attr.value, &init_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
+
+        // Set variable READ_ONLY
+        var_attr.accessLevel = UA_ACCESSLEVELMASK_READ;
+        
     } else if (strcmp(variable_type, "HoldingRegister") == 0) {
         access->var_type = MB_HOLDING_REGISTER;
         UA_StatusCode status_code = Server_setVariableTypeAndInitalValue(var_config, access, &var_attr);
         if (status_code != CONFIG_OK) return status_code;
+        var_attr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
+
     } else if (strcmp(variable_type, "InputRegister") == 0) {
         access->var_type = MB_INPUT_REGISTER;
         UA_StatusCode status_code = Server_setVariableType(var_config, access, &var_attr);
         if (status_code != CONFIG_OK) return status_code;
-        // TODO: Set variable READ_ONLY
-        // var_attr.userWriteMask = ?;
+        // Set variable READ_ONLY
+        var_attr.accessLevel = UA_ACCESSLEVELMASK_READ;
+
     } else {
         return CONFIG_ERROR;
     }
@@ -462,8 +480,8 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
                               this_node_id,
                               parent_node_id,
                               ref_node_id,
-                              UA_QUALIFIEDNAME(1, cJSON_GetObjectItem(var_config, "QualifiedName")->valuestring),
-                              UA_NODEID_NULL,
+                              UA_QUALIFIEDNAME(ns_index, cJSON_GetObjectItem(var_config, "QualifiedName")->valuestring),
+                              UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
                               var_attr, NULL, NULL);
     
     Map_put(modbus_access_map, UA_NodeId_hash(&this_node_id), access);
@@ -472,6 +490,7 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
 	callback.onRead = UAServer_beforeRead;
 	callback.onWrite = UAServer_afterWrite;
 	UA_Server_setVariableNode_valueCallback(ua_server, this_node_id, callback);
+    UA_Server_writeValue(ua_server, this_node_id, var_attr.value);
 
     return CONFIG_OK;
 }
@@ -480,7 +499,10 @@ UA_StatusCode Server_setVariableType(cJSON *var_config, Modbus_Access *access, U
 {
     char *data_type = cJSON_GetObjectItem(var_config, "DataType")->valuestring;
     if (strcmp(data_type, "FLOAT") == 0) {
-        var_attr->dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_FLOAT);
+        var_attr->dataType = UA_TYPES[UA_TYPES_FLOAT].typeId;
+
+        UA_Float init_value = 0;
+        UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_FLOAT]);
 
         char *byte_order = cJSON_GetObjectItem(var_config, "ByteOrder")->valuestring;
         if (strcmp(byte_order, "abcd") == 0) access->data_type = MB_FLOAT_ABCD;
@@ -490,12 +512,18 @@ UA_StatusCode Server_setVariableType(cJSON *var_config, Modbus_Access *access, U
         else return CONFIG_ERROR;
 
     } else if (strcmp(data_type, "UINT16") == 0) {
-        var_attr->dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_UINT16);
+        var_attr->dataType = UA_TYPES[UA_TYPES_UINT16].typeId;;
         access->data_type = MB_UINT16;
 
+        UA_UInt16 init_value = 0;
+        UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
+
     } else if (strcmp(data_type, "UINT32") == 0) {
-        var_attr->dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_UINT32);
+        var_attr->dataType = UA_TYPES[UA_TYPES_UINT32].typeId;;
         access->data_type = MB_UINT32;
+
+        UA_UInt32 init_value = 0;
+        UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
 
     } else {
         return CONFIG_ERROR;
@@ -507,7 +535,7 @@ UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Acc
 {
     char *data_type = cJSON_GetObjectItem(var_config, "DataType")->valuestring;
     if (strcmp(data_type, "FLOAT") == 0) {
-        var_attr->dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_FLOAT);
+        var_attr->dataType = UA_TYPES[UA_TYPES_FLOAT].typeId;
 
         char *byte_order = cJSON_GetObjectItem(var_config, "ByteOrder")->valuestring;
         if (strcmp(byte_order, "abcd") == 0) access->data_type = MB_FLOAT_ABCD;
@@ -519,23 +547,32 @@ UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Acc
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
             UA_Float init_value = (UA_Float)cJSON_GetObjectItem(var_config, "InitialValue")->valuedouble;
             UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_FLOAT]);
+        } else {
+            UA_Float init_value = 0;
+            UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_FLOAT]);
         }
 
     } else if (strcmp(data_type, "UINT16") == 0) {
-        var_attr->dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_UINT16);
+        var_attr->dataType = UA_TYPES[UA_TYPES_UINT16].typeId;
         access->data_type = MB_UINT16;
 
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
             UA_UInt16 init_value = (UA_UInt16)cJSON_GetObjectItem(var_config, "InitialValue")->valueint;
             UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
+        } else {
+            UA_UInt16 init_value = 0;
+            UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
         }
 
     } else if (strcmp(data_type, "UINT32") == 0) {
-        var_attr->dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_UINT32);
+        var_attr->dataType = UA_TYPES[UA_TYPES_UINT32].typeId;
         access->data_type = MB_UINT32;
 
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
             UA_UInt32 init_value = (UA_UInt32)cJSON_GetObjectItem(var_config, "InitialValue")->valueint;
+            UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
+        } else {
+            UA_UInt32 init_value = 0;
             UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
         }
 
