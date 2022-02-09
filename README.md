@@ -14,8 +14,10 @@ sudo apt-get install gcc cmake automake autoconf libtool
 
 ### 1. Build dependency for open62541
 
+you shall clone my revised open62541 library because I added a new API (UA_Server_writeWithoutCallback) in open62541
+
 ```bash
-git clone --branch v1.2.3 https://github.com/open62541/open62541.git
+git clone --branch ModbusNewAPI https://github.com/Naplesoul/open62541.git
 cd ./open62541
 git submodule update --init --recursive
 mkdir build && cd build
