@@ -3,7 +3,7 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-26 00:12:29
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-02-09 02:03:21
+ * @LastEditTime: 2022-02-09 12:25:13
  */
 
 #include <stdlib.h>
@@ -314,7 +314,7 @@ void UAServer_beforeRead(UA_Server *server,
         return;
     }
 
-    UA_Server_writeValue(server, *node_id, value);
+    UA_Server_writeValueWithoutCallback(server, *node_id, value);
 }
 
 void UAServer_afterWrite(UA_Server *server,
@@ -342,6 +342,7 @@ void UAServer_afterWrite(UA_Server *server,
             Server_setRegisters(access->data_type, data->value.data, buf);
             ret = modbus_write_registers(access->device, access->var_address, Server_getDataByteLength(access->data_type) / 2, buf);
         }
+        break;
     default:
         UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Cannot write INPUT data READ-ONLY");
         break;
@@ -393,6 +394,13 @@ UA_StatusCode Server_addModbusDevice(cJSON *device_config, MB_CONNECTION_TYPE co
                             UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE),
                             obj_attr, NULL, NULL);
 
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Trying to connect to Modbus device...");
+    if (modbus_connect(modbus_device) != 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Connection fail");
+        return CONNECT_ERROR;
+    }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Connected");
+
     if (cJSON_HasObjectItem(device_config, "Variables")) {
         cJSON *variables = cJSON_GetObjectItem(device_config, "Variables");
         int var_count = cJSON_GetArraySize(variables);
@@ -405,13 +413,6 @@ UA_StatusCode Server_addModbusDevice(cJSON *device_config, MB_CONNECTION_TYPE co
             }
         }
     }
-
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Trying to connect to Modbus device...");
-    if (modbus_connect(modbus_device) != 0) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Connection fail");
-        return CONNECT_ERROR;
-    }
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Connected");
 
     return CONFIG_OK;
 }
@@ -490,7 +491,9 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
 	callback.onRead = UAServer_beforeRead;
 	callback.onWrite = UAServer_afterWrite;
 	UA_Server_setVariableNode_valueCallback(ua_server, this_node_id, callback);
-    UA_Server_writeValue(ua_server, this_node_id, var_attr.value);
+    
+    if (var_attr.accessLevel & UA_ACCESSLEVELMASK_WRITE)
+        UA_Server_writeValue(ua_server, this_node_id, var_attr.value);
 
     return CONFIG_OK;
 }
