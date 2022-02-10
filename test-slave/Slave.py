@@ -1,8 +1,15 @@
+'''
+Description: 
+Autor: Le Chen
+Date: 2022-02-08 21:53:29
+LastEditors: Weihang Shen
+LastEditTime: 2022-02-09 21:24:05
+'''
 import sys
 
 import modbus_tk
 import modbus_tk.defines as cst
-from modbus_tk import modbus_tcp
+from modbus_tk import modbus_tcp, hooks
 
 # from modbus_tk import modbus_rtu
 # import serial
