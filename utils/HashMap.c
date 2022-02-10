@@ -63,6 +63,7 @@ HashMap *Map_new()
 {
     HashMap *map = (HashMap *)malloc(sizeof(HashMap));
     memset(map, 0, sizeof(HashMap));
+    return map;
 }
 
 void Map_free(HashMap *map, void free_func(void *))
