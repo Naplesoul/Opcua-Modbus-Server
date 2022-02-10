@@ -47,10 +47,10 @@ def setup():
 
 if __name__ == "__main__":
     setup()
-    try:
-        server.start()
-
-        while True:
+    server.start()
+    while True:
+        try:
+            print("\n> ", end='')
             cmd = sys.stdin.readline()
             args = cmd.split(' ')
 
@@ -73,7 +73,7 @@ if __name__ == "__main__":
                 slave.add_block(name, block_type, starting_address, length)
                 sys.stdout.write('done: block %s added\r\n' % name)
 
-            elif args[0] == 'set_values':
+            elif args[0] == 'set':
                 slave_id = int(args[1])
                 name = args[2]
                 address = int(args[3])
@@ -85,7 +85,7 @@ if __name__ == "__main__":
                 values = slave.get_values(name, address, len(values))
                 sys.stdout.write('done: values written: %s\r\n' % str(values))
 
-            elif args[0] == 'get_values':
+            elif args[0] == 'get':
                 slave_id = int(args[1])
                 name = args[2]
                 address = int(args[3])
@@ -96,5 +96,9 @@ if __name__ == "__main__":
 
             else:
                 sys.stdout.write("unknown command %s\r\n" % args[0])
-    finally:
-        server.stop()
+                
+        except KeyboardInterrupt:
+            server.stop()
+            break
+        except Exception as e:
+            print(e)
