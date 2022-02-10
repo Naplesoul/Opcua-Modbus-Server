@@ -3,7 +3,7 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-26 00:12:29
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-02-09 12:25:13
+ * @LastEditTime: 2022-02-10 12:16:21
  */
 
 #include <stdlib.h>
@@ -71,7 +71,8 @@ UA_StatusCode Server_addModbusDevice(cJSON *device_config, MB_CONNECTION_TYPE co
 UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_id, modbus_t *device);
 
 UA_StatusCode Server_setVariableType(cJSON *var_config, Modbus_Access *access, UA_VariableAttributes *var_attr);
-UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Access *access, UA_VariableAttributes *var_attr);
+UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Access *access,
+                                                   UA_VariableAttributes *var_attr, int *has_initial_value);
 
 /*##############################################################################################################################*/
 
@@ -432,6 +433,8 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
     access->var_address = cJSON_GetObjectItem(var_config, "VariableAddress")->valueint;
     char *variable_type = cJSON_GetObjectItem(var_config, "VariableType")->valuestring;
 
+    int has_initial_value = false;
+
     if (strcmp(variable_type, "CoilStatus") == 0) {
         access->var_type = MB_COIL_STATUS;
         access->data_type = MB_BOOLEAN;
@@ -439,6 +442,7 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
         var_attr.dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_BOOLEAN);
 
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
+            has_initial_value = true;
             UA_Boolean init_value = cJSON_GetObjectItem(var_config, "InitialValue")->valueint;
             UA_Variant_setScalar(&var_attr.value, &init_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
         } else {
@@ -462,7 +466,7 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
         
     } else if (strcmp(variable_type, "HoldingRegister") == 0) {
         access->var_type = MB_HOLDING_REGISTER;
-        UA_StatusCode status_code = Server_setVariableTypeAndInitalValue(var_config, access, &var_attr);
+        UA_StatusCode status_code = Server_setVariableTypeAndInitalValue(var_config, access, &var_attr, &has_initial_value);
         if (status_code != CONFIG_OK) return status_code;
         var_attr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
 
@@ -492,8 +496,10 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
 	callback.onWrite = UAServer_afterWrite;
 	UA_Server_setVariableNode_valueCallback(ua_server, this_node_id, callback);
     
-    if (var_attr.accessLevel & UA_ACCESSLEVELMASK_WRITE)
+    if (has_initial_value)
         UA_Server_writeValue(ua_server, this_node_id, var_attr.value);
+    else
+        UA_Server_writeValueWithoutCallback(ua_server, this_node_id, var_attr.value);
 
     return CONFIG_OK;
 }
@@ -534,7 +540,8 @@ UA_StatusCode Server_setVariableType(cJSON *var_config, Modbus_Access *access, U
     return CONFIG_OK;
 }
 
-UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Access *access, UA_VariableAttributes *var_attr)
+UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Access *access,
+                                                   UA_VariableAttributes *var_attr, int *has_initial_value)
 {
     char *data_type = cJSON_GetObjectItem(var_config, "DataType")->valuestring;
     if (strcmp(data_type, "FLOAT") == 0) {
@@ -548,9 +555,11 @@ UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Acc
         else return CONFIG_ERROR;
         
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
+            *has_initial_value = true;
             UA_Float init_value = (UA_Float)cJSON_GetObjectItem(var_config, "InitialValue")->valuedouble;
             UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_FLOAT]);
         } else {
+            *has_initial_value = false;
             UA_Float init_value = 0;
             UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_FLOAT]);
         }
@@ -560,9 +569,11 @@ UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Acc
         access->data_type = MB_UINT16;
 
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
+            *has_initial_value = true;
             UA_UInt16 init_value = (UA_UInt16)cJSON_GetObjectItem(var_config, "InitialValue")->valueint;
             UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
         } else {
+            *has_initial_value = false;
             UA_UInt16 init_value = 0;
             UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
         }
@@ -572,14 +583,17 @@ UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Acc
         access->data_type = MB_UINT32;
 
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
+            *has_initial_value = true;
             UA_UInt32 init_value = (UA_UInt32)cJSON_GetObjectItem(var_config, "InitialValue")->valueint;
             UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
         } else {
+            *has_initial_value = false;
             UA_UInt32 init_value = 0;
             UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
         }
 
     } else {
+        *has_initial_value = false;
         return CONFIG_ERROR;
     }
     return CONFIG_OK;
