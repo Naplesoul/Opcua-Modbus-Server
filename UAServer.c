@@ -3,7 +3,7 @@
  * @Autor: Weihang Shen
  * @Date: 2022-01-26 00:12:29
  * @LastEditors: Weihang Shen
- * @LastEditTime: 2022-02-10 12:16:21
+ * @LastEditTime: 2022-02-10 16:15:49
  */
 
 #include <stdlib.h>
@@ -176,37 +176,37 @@ void Server_getVariant(MB_Data_Type data_type, uint16_t *src, UA_Variant *dst)
         case MB_FLOAT_ABCD:
             {
                 UA_Float new_value = modbus_get_float_abcd(src);
-                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
+                UA_Variant_setScalarCopy(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
             }
             break;
         case MB_FLOAT_BADC:
             {
                 UA_Float new_value = modbus_get_float_badc(src);
-                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
+                UA_Variant_setScalarCopy(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
             }
             break;
         case MB_FLOAT_CDAB:
             {
                 UA_Float new_value = modbus_get_float_cdab(src);
-                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
+                UA_Variant_setScalarCopy(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
             }
             break;
         case MB_FLOAT_DCBA:
             {
                 UA_Float new_value = modbus_get_float_dcba(src);
-                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
+                UA_Variant_setScalarCopy(dst, &new_value, &UA_TYPES[UA_TYPES_FLOAT]);
             }
             break;
         case MB_UINT16:
             {
                 UA_UInt16 new_value = *src;
-                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_UINT16]);
+                UA_Variant_setScalarCopy(dst, &new_value, &UA_TYPES[UA_TYPES_UINT16]);
             }
             break;
         case MB_UINT32:
             {
                 UA_UInt32 new_value = ((uint32_t)(src[0]) << 16) | (uint32_t)src[1];
-                UA_Variant_setScalar(dst, &new_value, &UA_TYPES[UA_TYPES_UINT32]);
+                UA_Variant_setScalarCopy(dst, &new_value, &UA_TYPES[UA_TYPES_UINT32]);
             }
             break;
             
@@ -280,7 +280,7 @@ void UAServer_beforeRead(UA_Server *server,
             uint8_t buf[BUFFER_SIZE];
             ret = modbus_read_bits(access->device, access->var_address, access->bit_offset + 1, buf);
             UA_Boolean new_value = buf[access->bit_offset];
-            UA_Variant_setScalar(&value, &new_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
+            UA_Variant_setScalarCopy(&value, &new_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
         }
         break;
     case MB_INPUT_STATUS:
@@ -288,7 +288,7 @@ void UAServer_beforeRead(UA_Server *server,
             uint8_t buf[BUFFER_SIZE];
             ret = modbus_read_input_bits(access->device, access->var_address, access->bit_offset + 1, buf);
             UA_Boolean new_value = buf[access->bit_offset];
-            UA_Variant_setScalar(&value, &new_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
+            UA_Variant_setScalarCopy(&value, &new_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
         }
         break;
     case MB_HOLDING_REGISTER:
@@ -444,10 +444,10 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
             has_initial_value = true;
             UA_Boolean init_value = cJSON_GetObjectItem(var_config, "InitialValue")->valueint;
-            UA_Variant_setScalar(&var_attr.value, &init_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
+            UA_Variant_setScalarCopy(&var_attr.value, &init_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
         } else {
             UA_Boolean init_value = 0;
-            UA_Variant_setScalar(&var_attr.value, &init_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
+            UA_Variant_setScalarCopy(&var_attr.value, &init_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
         }
 
         var_attr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
@@ -459,7 +459,7 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
         var_attr.dataType = UA_NODEID_NUMERIC(0, UA_NS0ID_BOOLEAN);
 
         UA_Boolean init_value = 0;
-        UA_Variant_setScalar(&var_attr.value, &init_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        UA_Variant_setScalarCopy(&var_attr.value, &init_value, &UA_TYPES[UA_TYPES_BOOLEAN]);
 
         // Set variable READ_ONLY
         var_attr.accessLevel = UA_ACCESSLEVELMASK_READ;
@@ -481,6 +481,9 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
         return CONFIG_ERROR;
     }
 
+    UA_Variant init_value;
+    UA_Variant_copy(&var_attr.value, &init_value);
+
     UA_Server_addVariableNode(ua_server,
                               this_node_id,
                               parent_node_id,
@@ -497,9 +500,9 @@ UA_StatusCode Server_addModbusVariable(cJSON *var_config, UA_NodeId parent_node_
 	UA_Server_setVariableNode_valueCallback(ua_server, this_node_id, callback);
     
     if (has_initial_value)
-        UA_Server_writeValue(ua_server, this_node_id, var_attr.value);
+        UA_Server_writeValue(ua_server, this_node_id, init_value);
     else
-        UA_Server_writeValueWithoutCallback(ua_server, this_node_id, var_attr.value);
+        UA_Server_writeValueWithoutCallback(ua_server, this_node_id, init_value);
 
     return CONFIG_OK;
 }
@@ -511,7 +514,7 @@ UA_StatusCode Server_setVariableType(cJSON *var_config, Modbus_Access *access, U
         var_attr->dataType = UA_TYPES[UA_TYPES_FLOAT].typeId;
 
         UA_Float init_value = 0;
-        UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_FLOAT]);
+        UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_FLOAT]);
 
         char *byte_order = cJSON_GetObjectItem(var_config, "ByteOrder")->valuestring;
         if (strcmp(byte_order, "abcd") == 0) access->data_type = MB_FLOAT_ABCD;
@@ -525,14 +528,14 @@ UA_StatusCode Server_setVariableType(cJSON *var_config, Modbus_Access *access, U
         access->data_type = MB_UINT16;
 
         UA_UInt16 init_value = 0;
-        UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
+        UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
 
     } else if (strcmp(data_type, "UINT32") == 0) {
         var_attr->dataType = UA_TYPES[UA_TYPES_UINT32].typeId;;
         access->data_type = MB_UINT32;
 
         UA_UInt32 init_value = 0;
-        UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
+        UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
 
     } else {
         return CONFIG_ERROR;
@@ -557,11 +560,11 @@ UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Acc
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
             *has_initial_value = true;
             UA_Float init_value = (UA_Float)cJSON_GetObjectItem(var_config, "InitialValue")->valuedouble;
-            UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_FLOAT]);
+            UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_FLOAT]);
         } else {
             *has_initial_value = false;
             UA_Float init_value = 0;
-            UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_FLOAT]);
+            UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_FLOAT]);
         }
 
     } else if (strcmp(data_type, "UINT16") == 0) {
@@ -571,11 +574,11 @@ UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Acc
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
             *has_initial_value = true;
             UA_UInt16 init_value = (UA_UInt16)cJSON_GetObjectItem(var_config, "InitialValue")->valueint;
-            UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
+            UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
         } else {
             *has_initial_value = false;
             UA_UInt16 init_value = 0;
-            UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
+            UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
         }
 
     } else if (strcmp(data_type, "UINT32") == 0) {
@@ -585,11 +588,11 @@ UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Acc
         if (cJSON_HasObjectItem(var_config, "InitialValue")) {
             *has_initial_value = true;
             UA_UInt32 init_value = (UA_UInt32)cJSON_GetObjectItem(var_config, "InitialValue")->valueint;
-            UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
+            UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
         } else {
             *has_initial_value = false;
             UA_UInt32 init_value = 0;
-            UA_Variant_setScalar(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
+            UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
         }
 
     } else {
