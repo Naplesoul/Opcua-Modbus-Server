@@ -35,7 +35,7 @@ typedef enum
 
 typedef enum
 {
-    MB_BOOLEAN, MB_FLOAT_ABCD, MB_FLOAT_BADC, MB_FLOAT_CDAB, MB_FLOAT_DCBA, MB_UINT16, MB_UINT32
+    MB_BOOLEAN, MB_FLOAT_ABCD, MB_FLOAT_BADC, MB_FLOAT_CDAB, MB_FLOAT_DCBA, MB_UINT16, MB_UINT32, MB_INT16
 } MB_Data_Type;
 
 typedef struct
@@ -165,6 +165,7 @@ uint32_t Server_getDataByteLength(MB_Data_Type data_type)
         case MB_FLOAT_DCBA: return 4;
         case MB_UINT16: return 2;
         case MB_UINT32: return 4;
+        case MB_INT16: return 2;
         default: return 2;
     }
 }
@@ -199,7 +200,7 @@ void Server_getVariant(MB_Data_Type data_type, uint16_t *src, UA_Variant *dst)
             break;
         case MB_UINT16:
             {
-                UA_UInt16 new_value = *src;
+                UA_UInt16 new_value = *(uint16_t *)src;
                 UA_Variant_setScalarCopy(dst, &new_value, &UA_TYPES[UA_TYPES_UINT16]);
             }
             break;
@@ -207,6 +208,13 @@ void Server_getVariant(MB_Data_Type data_type, uint16_t *src, UA_Variant *dst)
             {
                 UA_UInt32 new_value = ((uint32_t)(src[0]) << 16) | (uint32_t)src[1];
                 UA_Variant_setScalarCopy(dst, &new_value, &UA_TYPES[UA_TYPES_UINT32]);
+            }
+            break;
+
+        case MB_INT16:
+            {
+                UA_Int16 new_value = *(int16_t *)src;
+                UA_Variant_setScalarCopy(dst, &new_value, &UA_TYPES[UA_TYPES_INT16]);
             }
             break;
             
@@ -245,14 +253,22 @@ void Server_setRegisters(MB_Data_Type data_type, UA_Variant *src, uint16_t *dst)
             break;
         case MB_UINT16:
             {
-                dst[0] = *(UA_UInt16 *)src;
+                uint16_t new_value = *(UA_UInt16 *)src;
+                dst[0] = (uint16_t)new_value;
             }
             break;
         case MB_UINT32:
             {
                 uint32_t new_value = *(UA_UInt32 *)src;
-                dst[0] = new_value >> 16;
-                dst[1] = new_value;
+                dst[0] = (uint16_t)(new_value >> 16);
+                dst[1] = (uint16_t)new_value;
+            }
+            break;
+
+        case MB_INT16:
+            {
+                int16_t new_value = *(UA_Int16 *)src;
+                dst[0] = (uint16_t)new_value;
             }
             break;
             
@@ -524,18 +540,25 @@ UA_StatusCode Server_setVariableType(cJSON *var_config, Modbus_Access *access, U
         else return CONFIG_ERROR;
 
     } else if (strcmp(data_type, "UINT16") == 0) {
-        var_attr->dataType = UA_TYPES[UA_TYPES_UINT16].typeId;;
+        var_attr->dataType = UA_TYPES[UA_TYPES_UINT16].typeId;
         access->data_type = MB_UINT16;
 
         UA_UInt16 init_value = 0;
         UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT16]);
 
     } else if (strcmp(data_type, "UINT32") == 0) {
-        var_attr->dataType = UA_TYPES[UA_TYPES_UINT32].typeId;;
+        var_attr->dataType = UA_TYPES[UA_TYPES_UINT32].typeId;
         access->data_type = MB_UINT32;
 
         UA_UInt32 init_value = 0;
         UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
+
+    } else if (strcmp(data_type, "INT16") == 0) {
+        var_attr->dataType = UA_TYPES[UA_TYPES_INT16].typeId;
+        access->data_type = MB_INT16;
+
+        UA_Int16 init_value = 0;
+        UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_INT16]);
 
     } else {
         return CONFIG_ERROR;
@@ -593,6 +616,20 @@ UA_StatusCode Server_setVariableTypeAndInitalValue(cJSON *var_config, Modbus_Acc
             *has_initial_value = false;
             UA_UInt32 init_value = 0;
             UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_UINT32]);
+        }
+
+    } else if (strcmp(data_type, "INT16") == 0) {
+        var_attr->dataType = UA_TYPES[UA_TYPES_INT16].typeId;
+        access->data_type = MB_INT16;
+
+        if (cJSON_HasObjectItem(var_config, "InitialValue")) {
+            *has_initial_value = true;
+            UA_Int16 init_value = (UA_Int16)cJSON_GetObjectItem(var_config, "InitialValue")->valueint;
+            UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_INT16]);
+        } else {
+            *has_initial_value = false;
+            UA_Int16 init_value = 0;
+            UA_Variant_setScalarCopy(&var_attr->value, &init_value, &UA_TYPES[UA_TYPES_INT16]);
         }
 
     } else {
