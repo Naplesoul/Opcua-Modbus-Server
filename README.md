@@ -164,10 +164,21 @@ the example below shows how the config json file is written
             ]
         }
     ],
-    "ModbusTCPs":	// json array contains modbus slaves running at TCP mode, NOT SUPPORTED yet
+    "ModbusTCPs":	// json array contains modbus slaves running at TCP mode
     [
         {
-
+		"NamespaceIndex": 1,
+		"NodeID": "KFR-35GW-2",
+            	"DisplayName": "Air Conditioner KFR-35GW-2",
+            	"Description": "a smart air conditioner with a temperature sensor and a humidity sensor",
+            	"QualifiedName": "Air Conditioner",
+		"MB_MachineAddress": 1,
+            	"IP": "127.0.0.1",
+            	"Port": 5502,
+            	"Variables": 
+		[
+			// same as ModbusRTUs
+		]
         }
     ]
 }
